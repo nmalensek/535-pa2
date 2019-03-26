@@ -2,7 +2,9 @@ import org.apache.log4j.Logger;
 import org.apache.storm.Config;
 import org.apache.storm.hdfs.bolt.HdfsBolt;
 import org.apache.storm.hdfs.bolt.format.DefaultFileNameFormat;
+import org.apache.storm.hdfs.bolt.format.DelimitedRecordFormat;
 import org.apache.storm.hdfs.bolt.format.FileNameFormat;
+import org.apache.storm.hdfs.bolt.format.RecordFormat;
 import org.apache.storm.hdfs.bolt.rotation.FileRotationPolicy;
 import org.apache.storm.hdfs.bolt.rotation.FileSizeRotationPolicy;
 import org.apache.storm.hdfs.bolt.sync.CountSyncPolicy;
@@ -54,21 +56,23 @@ public class TwitterStreamTopology {
         builder.setBolt(tagCountId, new CountBolt(), 3).fieldsGrouping(individualTagsId, new Fields("tag"));
         builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, 10), 3).fieldsGrouping(tagCountId, new Fields(
                 "obj"));
-        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(), 3).globalGrouping(intermediateRankerId);
+        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(10, 100), 3)
+                .globalGrouping(intermediateRankerId);
 
         // sync the filesystem after every tuple
-        SyncPolicy syncPolicy = new CountSyncPolicy(10);
+        SyncPolicy syncPolicy = new CountSyncPolicy(1);
         // rotate files when they reach 5MB
         FileRotationPolicy rotationPolicy = new FileSizeRotationPolicy(5.0f, FileSizeRotationPolicy.Units.MB);
-        FileNameFormat fileNameFormat = new DefaultFileNameFormat()
-                .withPath("/rankings/");
+        FileNameFormat fileNameFormat = new DefaultFileNameFormat().withPath("/rankings/");
+        RecordFormat recordFormat = new DelimitedRecordFormat().withRecordDelimiter("\n").withFieldDelimiter(",");
 
         HdfsBolt hdfsBolt = new HdfsBolt().withFsUrl("hdfs://phoenix.cs.colostate.edu:30160")
+                .withRecordFormat(recordFormat)
                 .withFileNameFormat(fileNameFormat)
                 .withSyncPolicy(syncPolicy)
                 .withRotationPolicy(rotationPolicy);
 
-        builder.setBolt(hdfsId, hdfsBolt, 1).shuffleGrouping(tagLoggerId);
+        builder.setBolt(hdfsId, hdfsBolt, 1).globalGrouping(tagLoggerId);
     }
 
     public void runLocally() throws InterruptedException {
@@ -85,10 +89,11 @@ public class TwitterStreamTopology {
      * Usage: "TwitterStreamTopology [local|remote]"
      *
      * # Runs in local mode (LocalCluster), with topology name "tweetWindowCounts"
-     * $ storm jar storm-starter-jar-with-dependencies.jar org.apache.storm.starter.RollingTopWords
+     * $ storm jar pa2-1.0-SNAPSHOT.jar TwitterStreamTopology
      *
      * # Runs in remote/cluster mode, with topology name "production-topology"
-     * $ storm jar storm-starter-jar-with-dependencies.jar org.apache.storm.starter.RollingTopWords production-topology remote
+     * NOT IMPLEMENTED YET ***
+     * $ storm jar pa2-1.0-SNAPSHOT.jar TwitterStreamTopology production-topology remote
      * ```
      *
      * @param args First positional argument defines

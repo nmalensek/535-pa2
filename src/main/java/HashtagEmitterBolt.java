@@ -22,7 +22,9 @@ public class HashtagEmitterBolt extends BaseRichBolt {
 
     public void execute(Tuple tuple) {
         String[] tagArray = Arrays.stream(((Status) tuple.getValue(0)).getHashtagEntities()).map(HashtagEntity::getText).toArray(String[]::new);
-        collector.emit(new Values(String.join(",", tagArray)));
+        if (tagArray.length > 0) {
+            collector.emit(new Values(String.join(",", tagArray)));
+        }
         collector.ack(tuple);
     }
 
