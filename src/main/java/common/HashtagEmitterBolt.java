@@ -1,3 +1,5 @@
+package common;
+
 import org.apache.log4j.Logger;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -12,26 +14,23 @@ import twitter4j.Status;
 import java.util.Arrays;
 import java.util.Map;
 
-public class IndividualTagEmitterBolt extends BaseRichBolt {
-    private static final Logger LOGGER = Logger.getLogger(IndividualTagEmitterBolt.class);
+public class HashtagEmitterBolt extends BaseRichBolt {
+    private static final Logger LOGGER = Logger.getLogger(HashtagEmitterBolt.class);
     private OutputCollector collector;
 
-    @Override
     public void prepare(Map map, TopologyContext topologyContext, OutputCollector outputCollector) {
         this.collector = outputCollector;
     }
 
-    @Override
     public void execute(Tuple tuple) {
-        String[] tags = ((String) tuple.getValue(0)).split(",");
-        for (String s : tags) {
-            collector.emit(new Values(s));
+        String[] tagArray = Arrays.stream(((Status) tuple.getValue(0)).getHashtagEntities()).map(HashtagEntity::getText).toArray(String[]::new);
+        if (tagArray.length > 0) {
+            collector.emit(new Values(String.join(",", tagArray)));
         }
         collector.ack(tuple);
     }
 
-    @Override
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
-        outputFieldsDeclarer.declare(new Fields("tag"));
+        outputFieldsDeclarer.declare(new Fields("hashtags"));
     }
 }

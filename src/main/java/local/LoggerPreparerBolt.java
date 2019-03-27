@@ -1,3 +1,5 @@
+package local;
+
 import org.apache.storm.Config;
 import org.apache.storm.starter.tools.Rankings;
 import org.apache.storm.task.OutputCollector;

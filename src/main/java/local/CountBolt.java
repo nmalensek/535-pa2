@@ -1,3 +1,5 @@
+package local;
+
 import org.apache.log4j.Logger;
 import org.apache.storm.Config;
 import org.apache.storm.starter.tools.SlidingWindowCounter;
@@ -57,6 +59,7 @@ public class CountBolt extends BaseRichBolt {
     }
 
     private void emit(Map<Object, Long> counts) {
+        StringBuilder builder = new StringBuilder();
         for (Map.Entry<Object, Long> entry : counts.entrySet()) {
             Object obj = entry.getKey();
             Long count = entry.getValue();

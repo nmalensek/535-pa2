@@ -1,3 +1,7 @@
+import common.HashtagEmitterBolt;
+import common.IndividualTagEmitterBolt;
+import common.TwitterStreamSpout;
+import local.*;
 import org.apache.log4j.Logger;
 import org.apache.storm.Config;
 import org.apache.storm.hdfs.bolt.HdfsBolt;
@@ -26,13 +30,17 @@ public class TwitterStreamTopology {
     private final Config topologyConfig;
     private final int runtimeInSeconds;
 
-    public TwitterStreamTopology(String topologyName) throws InterruptedException {
+    public TwitterStreamTopology(String topologyName, boolean runLocally) throws InterruptedException {
         builder = new TopologyBuilder();
         this.topologyName = topologyName;
         topologyConfig = createTopologyConfiguration();
         runtimeInSeconds = DEFAULT_RUNTIME_IN_SECONDS;
 
-        buildTopology();
+        if (runLocally) {
+            buildLocalTopology();
+        } else {
+            //build remote topology here
+        }
     }
 
     private static Config createTopologyConfiguration() {
@@ -41,7 +49,7 @@ public class TwitterStreamTopology {
         return conf;
     }
 
-    private void buildTopology() throws InterruptedException {
+    private void buildLocalTopology() throws InterruptedException {
         String spoutId = "tweetSpout";
         String hashtagsEmitterId = "hashtags";
         String individualTagsId = "singleTags";
@@ -109,7 +117,7 @@ public class TwitterStreamTopology {
         }
 
         LOG.info("Topology name: " + topologyName);
-        TwitterStreamTopology twitterStreamTopology = new TwitterStreamTopology(topologyName);
+        TwitterStreamTopology twitterStreamTopology = new TwitterStreamTopology(topologyName, runLocally);
         if (runLocally) {
             LOG.info("Running in local mode");
             twitterStreamTopology.runLocally();
