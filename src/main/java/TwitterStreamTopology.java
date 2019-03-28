@@ -17,6 +17,7 @@ import org.apache.storm.starter.bolt.IntermediateRankingsBolt;
 import org.apache.storm.starter.util.StormRunner;
 import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.tuple.Fields;
+import parallel.LossyCounterBolt;
 
 public class TwitterStreamTopology {
 
@@ -39,13 +40,13 @@ public class TwitterStreamTopology {
         if (runLocally) {
             buildLocalTopology();
         } else {
-            //build remote topology here
+            buildRemoteTopology();
         }
     }
 
     private static Config createTopologyConfiguration() {
         Config conf = new Config();
-        conf.setDebug(true);
+        conf.setDebug(false);
         return conf;
     }
 
@@ -58,13 +59,13 @@ public class TwitterStreamTopology {
         String tagLoggerId = "tagLogger";
         String hdfsId = "hdfsBolt";
         builder.setSpout(spoutId, new TwitterStreamSpout(), 1);
-        builder.setBolt(hashtagsEmitterId, new HashtagEmitterBolt(), 3).fieldsGrouping(spoutId, new Fields("tweet"));
-        builder.setBolt(individualTagsId, new IndividualTagEmitterBolt(), 3)
+        builder.setBolt(hashtagsEmitterId, new HashtagEmitterBolt(), 1).fieldsGrouping(spoutId, new Fields("tweet"));
+        builder.setBolt(individualTagsId, new IndividualTagEmitterBolt(), 1)
                 .fieldsGrouping(hashtagsEmitterId, new Fields("hashtags"));
-        builder.setBolt(tagCountId, new CountBolt(), 3).fieldsGrouping(individualTagsId, new Fields("tag"));
-        builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, 10), 3).fieldsGrouping(tagCountId, new Fields(
+        builder.setBolt(tagCountId, new CountBolt(), 1).fieldsGrouping(individualTagsId, new Fields("tag"));
+        builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, 1), 3).fieldsGrouping(tagCountId, new Fields(
                 "obj"));
-        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(10, 100), 3)
+        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(10, 100), 1)
                 .globalGrouping(intermediateRankerId);
 
         // sync the filesystem after every tuple
@@ -83,8 +84,21 @@ public class TwitterStreamTopology {
         builder.setBolt(hdfsId, hdfsBolt, 1).globalGrouping(tagLoggerId);
     }
 
+    private void buildRemoteTopology() throws InterruptedException {
+        String spoutId = "tweetSpout";
+        String hashtagsEmitterId = "hashtags";
+        String individualTagsId = "singleTags";
+        String lossyCounterId = "lossyCounter";
+        builder.setSpout(spoutId, new TwitterStreamSpout(), 1);
+        builder.setBolt(hashtagsEmitterId, new HashtagEmitterBolt(), 4).fieldsGrouping(spoutId, new Fields("tweet"));
+        builder.setBolt(individualTagsId, new IndividualTagEmitterBolt(), 4)
+                .fieldsGrouping(hashtagsEmitterId, new Fields("hashtags"));
+        builder.setBolt(lossyCounterId, new LossyCounterBolt(), 4).fieldsGrouping(individualTagsId, new Fields("tag"));
+
+    }
+
     public void runLocally() throws InterruptedException {
-        StormRunner.runTopologyLocally(builder.createTopology(), topologyName, topologyConfig, runtimeInSeconds);
+        StormRunner.runTopologyLocally(builder.createTopology(), topologyName, topologyConfig, DEFAULT_RUNTIME_IN_SECONDS);
     }
 
     public void runRemotely() throws Exception {

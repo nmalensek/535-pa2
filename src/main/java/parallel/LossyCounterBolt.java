@@ -25,7 +25,6 @@ public class LossyCounterBolt extends BaseRichBolt {
     private final AtomicInteger bucketNumber = new AtomicInteger(1);
     private final AtomicInteger N = new AtomicInteger(0);
     private final HashMap<String, BucketEntry> bucketItems = new HashMap<>();
-    private long timestamp;
 
     private final int emitFrequency;
     private OutputCollector collector;
@@ -41,13 +40,11 @@ public class LossyCounterBolt extends BaseRichBolt {
 
     public void prepare(Map map, TopologyContext topologyContext, OutputCollector outputCollector) {
         this.collector = outputCollector;
-        timestamp = System.currentTimeMillis();
     }
 
     public void execute(Tuple tuple) {
         if (TupleUtils.isTick(tuple)) {
-            collector.emit(new Values(timestamp, getSortedRankings()));
-            timestamp = System.currentTimeMillis();
+            emitSortedRankings();
         } else {
             countObjAndAck(tuple);
             if (N.incrementAndGet() % itemsPerBucket == 0) {
@@ -58,12 +55,10 @@ public class LossyCounterBolt extends BaseRichBolt {
     }
 
     //call when emitting (not necessarily after deletion phase because that happens on item counts vs. emitting on a timer).
-    private List<BucketEntry> getSortedRankings() {
-        List<BucketEntry> entries = new ArrayList<>(bucketItems.values());
-        Collections.sort(entries);
-        Collections.reverse(entries);
-
-        return entries;
+    private void emitSortedRankings() {
+        for (Map.Entry e : bucketItems.entrySet()) {
+            collector.emit(new Values(e.getKey(), ((BucketEntry)e.getValue()).getCount()));
+        }
     }
 
     private void countObjAndAck(Tuple tuple) {
