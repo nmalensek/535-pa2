@@ -1,3 +1,5 @@
+package parallel;
+
 import common.HashtagEmitterBolt;
 import common.IndividualTagEmitterBolt;
 import common.TwitterStreamSpout;

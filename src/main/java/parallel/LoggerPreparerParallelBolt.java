@@ -1,4 +1,4 @@
-package local;
+package parallel;
 
 import org.apache.storm.Config;
 import org.apache.storm.starter.tools.Rankings;
@@ -31,40 +31,18 @@ public class LoggerPreparerParallelBolt extends BaseRichBolt {
         timestamp = System.currentTimeMillis();
     }
 
+
     @Override
     public void execute(Tuple tuple) {
-        if (TupleUtils.isTick(tuple)) {
-            if (aggregateRankings.size() > 0) {
-                collector.emit(new Values(timestamp, aggregateRankings.copy()));
-                timestamp = System.currentTimeMillis();
-            }
-        } else {
-            List<BucketEntry> rankings = ((List<BucketEntry>) tuple.getValue(0));
-            updateRankings(rankings);
-            pruneZeros();
-        }
-    }
 
-
-    private void updateRankings(List<BucketEntry> rankings) {
-		for (BucketEntry e : rankings) {
+		aggregateRankings.clear();
+		for (BucketEntry e : ((List<BucketEntry>) tuple.getValue(0))) {
 			aggregateRankings.add(e);
-            Collections.sort(aggregateRankings);
-            Collections.reverse(aggregateRankings);
 		}
-	}
 
-
-    private void pruneZeros() {
-		int i = 0;
-		while (i < aggregateRankings.size()) {
-			if (aggregateRankings.get(i).getCount() == 0) {
-				aggregateRankings.remove(i);
-			}
-
-			else {
-				i++;
-			}
+		if (aggregateRankings.size() > 0) {
+			collector.emit(new Values(timestamp, aggregateRankings));
+			timestamp = System.currentTimeMillis();
 		}
 	}
 
@@ -73,6 +51,7 @@ public class LoggerPreparerParallelBolt extends BaseRichBolt {
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
         outputFieldsDeclarer.declare(new Fields("timestamp", "rankings"));
     }
+
 
     @Override
     public Map<String, Object> getComponentConfiguration() {
