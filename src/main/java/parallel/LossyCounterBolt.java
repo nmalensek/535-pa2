@@ -44,20 +44,14 @@ public class LossyCounterBolt extends BaseRichBolt {
 
     public void execute(Tuple tuple) {
         if (TupleUtils.isTick(tuple)) {
-            emitSortedRankings();
+            List<BucketEntry> entries = new LinkedList<>(bucketItems.values());
+            collector.emit(new Values(entries));
         } else {
             countObjAndAck(tuple);
             if (N.incrementAndGet() % itemsPerBucket == 0) {
                 executeDeletePhase();
                 bucketNumber.incrementAndGet();
             }
-        }
-    }
-
-    //call when emitting (not necessarily after deletion phase because that happens on item counts vs. emitting on a timer).
-    private void emitSortedRankings() {
-        for (Map.Entry e : bucketItems.entrySet()) {
-            collector.emit(new Values(e.getKey(), ((BucketEntry)e.getValue()).getCount()));
         }
     }
 
@@ -90,6 +84,6 @@ public class LossyCounterBolt extends BaseRichBolt {
     }
 
     public void declareOutputFields(OutputFieldsDeclarer outputFieldsDeclarer) {
-        outputFieldsDeclarer.declare(new Fields("obj", "count"));
+        outputFieldsDeclarer.declare(new Fields("obj"));
     }
 }

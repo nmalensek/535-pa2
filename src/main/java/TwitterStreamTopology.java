@@ -25,6 +25,7 @@ public class TwitterStreamTopology {
 
     private static final int DEFAULT_RUNTIME_IN_SECONDS = 120;
     private static final int TOP_N = 100;
+    private static final int DEFAULT_EMIT_FREQUENCY_IN_SECONDS = 10;
 
     private final TopologyBuilder builder;
     private final String topologyName;
@@ -63,9 +64,9 @@ public class TwitterStreamTopology {
         builder.setBolt(individualTagsId, new IndividualTagEmitterBolt(), 1)
                 .fieldsGrouping(hashtagsEmitterId, new Fields("hashtags"));
         builder.setBolt(tagCountId, new CountBolt(), 1).fieldsGrouping(individualTagsId, new Fields("tag"));
-        builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, 1), 3).fieldsGrouping(tagCountId, new Fields(
+        builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, DEFAULT_EMIT_FREQUENCY_IN_SECONDS), 1).fieldsGrouping(tagCountId, new Fields(
                 "obj"));
-        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(10, 100), 1)
+        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(TOP_N, DEFAULT_EMIT_FREQUENCY_IN_SECONDS), 1)
                 .globalGrouping(intermediateRankerId);
 
         // sync the filesystem after every tuple
@@ -89,12 +90,32 @@ public class TwitterStreamTopology {
         String hashtagsEmitterId = "hashtags";
         String individualTagsId = "singleTags";
         String lossyCounterId = "lossyCounter";
+        String intermediateRankerId = "intermediateRanker";
+        String tagLoggerId = "tagLogger";
+        String hdfsId = "hdfsBolt";
+
         builder.setSpout(spoutId, new TwitterStreamSpout(), 1);
         builder.setBolt(hashtagsEmitterId, new HashtagEmitterBolt(), 4).fieldsGrouping(spoutId, new Fields("tweet"));
         builder.setBolt(individualTagsId, new IndividualTagEmitterBolt(), 4)
                 .fieldsGrouping(hashtagsEmitterId, new Fields("hashtags"));
         builder.setBolt(lossyCounterId, new LossyCounterBolt(), 4).fieldsGrouping(individualTagsId, new Fields("tag"));
+        builder.setBolt(intermediateRankerId, new IntermediateRankingsBolt(TOP_N, DEFAULT_EMIT_FREQUENCY_IN_SECONDS), 4);
+        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(TOP_N, DEFAULT_EMIT_FREQUENCY_IN_SECONDS), 1);
 
+        // sync the filesystem after every tuple
+        SyncPolicy syncPolicy = new CountSyncPolicy(1);
+        // rotate files when they reach 5MB
+        FileRotationPolicy rotationPolicy = new FileSizeRotationPolicy(5.0f, FileSizeRotationPolicy.Units.MB);
+        FileNameFormat fileNameFormat = new DefaultFileNameFormat().withPath("/rankings/");
+        RecordFormat recordFormat = new DelimitedRecordFormat().withRecordDelimiter("\n").withFieldDelimiter(",");
+
+        HdfsBolt hdfsBolt = new HdfsBolt().withFsUrl("hdfs://phoenix.cs.colostate.edu:30160")
+                .withRecordFormat(recordFormat)
+                .withFileNameFormat(fileNameFormat)
+                .withSyncPolicy(syncPolicy)
+                .withRotationPolicy(rotationPolicy);
+
+        builder.setBolt(hdfsId, hdfsBolt, 1).globalGrouping(tagLoggerId);
     }
 
     public void runLocally() throws InterruptedException {
