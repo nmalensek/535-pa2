@@ -63,7 +63,7 @@ public class TwitterStreamParallelTopology {
                 "obj"));
         builder.setBolt(globalRankerId, new RankingsBolt(), 3)
                 .globalGrouping(interimRankerId);
-        builder.setBolt(tagLoggerId, new LoggerPreparerBolt(10, 100), 3)
+        builder.setBolt(tagLoggerId, new LoggerPreparerParallelBolt(10, 100), 3)
                 .globalGrouping(globalRankerId);
 
         // sync the filesystem after every tuple
