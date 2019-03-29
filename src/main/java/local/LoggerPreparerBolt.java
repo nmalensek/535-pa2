@@ -20,7 +20,7 @@ public class LoggerPreparerBolt extends BaseRichBolt {
     private int emitFrequencyInSeconds;
     private final Rankings aggregateRankings;
 
-    public LoggerPreparerBolt(int emitFrequencyInSeconds, int topN) {
+    public LoggerPreparerBolt(int topN, int emitFrequencyInSeconds) {
         this.aggregateRankings = new Rankings(topN);
         this.emitFrequencyInSeconds = emitFrequencyInSeconds;
     }

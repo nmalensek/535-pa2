@@ -37,6 +37,8 @@ public class BucketEntry implements Serializable, Comparable<BucketEntry> {
         return count;
     }
 
+    public void setCount(int count) { this.count = count; }
+
     public int getDelta() {
         return delta;
     }
