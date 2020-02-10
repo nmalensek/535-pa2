@@ -15,7 +15,6 @@ import org.apache.storm.hdfs.bolt.rotation.FileRotationPolicy;
 import org.apache.storm.hdfs.bolt.rotation.FileSizeRotationPolicy;
 import org.apache.storm.hdfs.bolt.sync.CountSyncPolicy;
 import org.apache.storm.hdfs.bolt.sync.SyncPolicy;
-import org.apache.storm.starter.bolt.IntermediateRankingsBolt;
 import org.apache.storm.starter.util.StormRunner;
 import org.apache.storm.topology.TopologyBuilder;
 import org.apache.storm.tuple.Fields;
@@ -25,7 +24,7 @@ public class TwitterStreamParallelTopology {
     private static final Logger LOG = Logger.getLogger(TwitterStreamParallelTopology.class);
 
     private static final int DEFAULT_RUNTIME_IN_SECONDS = 120;
-    //private static final int TOP_N = 100;
+    private static final int TOP_N = 100;
 
     private final TopologyBuilder builder;
     private final String topologyName;
@@ -37,13 +36,13 @@ public class TwitterStreamParallelTopology {
         this.topologyName = topologyName;
         topologyConfig = createTopologyConfiguration();
         runtimeInSeconds = DEFAULT_RUNTIME_IN_SECONDS;
-		buildRemoteTopology();
+        buildRemoteTopology();
     }
 
     private static Config createTopologyConfiguration() {
         Config conf = new Config();
         conf.setDebug(true);
-		conf.setNumWorkers(4);
+        conf.setNumWorkers(4);
         return conf;
     }
 
@@ -65,7 +64,7 @@ public class TwitterStreamParallelTopology {
                 "obj"));
         builder.setBolt(globalRankerId, new RankingsBolt(), 3)
                 .globalGrouping(interimRankerId);
-        builder.setBolt(tagLoggerId, new LoggerPreparerParallelBolt(10, 100), 3)
+        builder.setBolt(tagLoggerId, new LoggerPreparerParallelBolt(TOP_N, 10), 3)
                 .globalGrouping(globalRankerId);
 
         // sync the filesystem after every tuple
@@ -75,7 +74,7 @@ public class TwitterStreamParallelTopology {
         FileNameFormat fileNameFormat = new DefaultFileNameFormat().withPath("/rankings/");
         RecordFormat recordFormat = new DelimitedRecordFormat().withRecordDelimiter("\n").withFieldDelimiter(",");
 
-        HdfsBolt hdfsBolt = new HdfsBolt().withFsUrl("hdfs://cheyenne.cs.colostate.edu:30141")
+        HdfsBolt hdfsBolt = new HdfsBolt().withFsUrl("hdfs://phoenix.cs.colostate.edu:30160")
                 .withRecordFormat(recordFormat)
                 .withFileNameFormat(fileNameFormat)
                 .withSyncPolicy(syncPolicy)
@@ -104,9 +103,7 @@ public class TwitterStreamParallelTopology {
 
         LOG.info("Topology name: " + topologyName);
         TwitterStreamParallelTopology twitterStreamTopology = new TwitterStreamParallelTopology(topologyName);
-        else {
-            LOG.info("Running in remote (cluster) mode");
-            twitterStreamTopology.runRemotely();
-        }
+        LOG.info("Running in remote (cluster) mode");
+        twitterStreamTopology.runRemotely();
     }
 }
